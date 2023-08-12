@@ -1,0 +1,273 @@
+//@version=5
+indicator("JOYA PROFE ANDRES", shorttitle = "JOYA PROFE ANDRES 4 CONF.", overlay = true)
+//INDICATOR WITH ALERTS (LONGS AND SHORTS) CREATED BY ANDRES ARISTIZABAL USING THE ORIGINALS FROM Dziwne, KivancOzbilgic and Minkel00 (MY SPECIAL THANKS TO ALL OF THEM FOR THEIR EFFORTS). FOUR CONFIRMATIONS IN ONE: TREND A-V2, SUPERTREND, QQE MOD AND RSI 30-70, JUNE 2023
+
+//TREND INDICATOR A-V2 CREATED BY Dziwne
+ma_type = input.string(title="MA Type", defval="VWMA", options=["EMA", "SMA", "SWMA", "VWMA", "WMA"])
+ma_period = input.int(title="MA Period (Length)", defval=52, minval=1)
+ma_period_smoothing = input.int(title="MA Period smoothing (Length)", defval=10, minval=1)
+
+color_positive = input(title="Positive color (Bullish)", defval=color.new(#26A69A, 50) )
+color_negative = input(title="Negative color (Bearish)", defval=color.new(#EF5350, 50) )
+color_hl = input(title="High & Low cloud color", defval=color.new(#808080, 80) )
+
+show_line = input(title="Show (lines)", defval=false)
+show_hl_cloud = input(title="Show (High & Low cloud)", defval=true)
+show_oc_cloud = input(title="Show (Open & Close cloud)", defval=true)
+
+//————————————————————————————————————————————————————————————————————————————————
+// I.2. Settings, Function definition — — — — — — — — — — — — — — — — — — — — — — 
+//————————————————————————————————————————————————————————————————————————————————
+
+f_ma_type(input_ma_type, input_source, input_ma_period) => 
+    result = float(na)
+
+    if input_ma_type == "EMA"
+        result := ta.ema(input_source, input_ma_period)
+        result
+    if input_ma_type == "SMA"
+        result := ta.sma(input_source, input_ma_period)
+        result
+    if input_ma_type == "SWMA"
+        result := ta.swma(input_source)
+        result
+    if input_ma_type == "VWMA"
+        result := ta.vwma(input_source, input_ma_period)
+        result
+    if input_ma_type == "WMA"
+        result := ta.wma(input_source, input_ma_period)
+        result
+
+    result
+
+//————————————————————————————————————————————————————————————————————————————————
+// II.1. Calculations, MA — — — — — — — — — — — — — — — — — — — — — — — — — — — — 
+//————————————————————————————————————————————————————————————————————————————————
+
+o = f_ma_type(ma_type, open, ma_period)
+c = f_ma_type(ma_type, close, ma_period)
+h = f_ma_type(ma_type, high, ma_period)
+l = f_ma_type(ma_type, low, ma_period)
+
+// II.2. Calculations, Heikin Ashi 
+ha_close= (open + close + high + low)/4
+ha_open = 0.0
+ha_open:= (nz(ha_open[1])+ha_close[1]) /2
+ha_high = math.max(math.max(math.max(ha_close, ha_open), high), low)
+ha_low  = math.min(math.min(math.min(ha_close, ha_open), high), low)
+
+ha_o = f_ma_type(ma_type, ha_open, ma_period)
+ha_c = f_ma_type(ma_type, ha_close, ma_period)
+ha_h = f_ma_type(ma_type, ha_high, ma_period)
+ha_l = f_ma_type(ma_type, ha_low, ma_period)
+
+//————————————————————————————————————————————————————————————————————————————————
+// II.3. Calculations, MA (Smoothing) — — — — — — — — — — — — — — — — — — — — — — 
+//————————————————————————————————————————————————————————————————————————————————
+
+ha_o_smooth = f_ma_type(ma_type, ha_o, ma_period_smoothing)
+ha_c_smooth = f_ma_type(ma_type, ha_c, ma_period_smoothing)
+ha_h_smooth = f_ma_type(ma_type, ha_h, ma_period_smoothing)
+ha_l_smooth = f_ma_type(ma_type, ha_l, ma_period_smoothing)
+
+//————————————————————————————————————————————————————————————————————————————————
+// III.1. Display, Colors — — — — — — — — — — — — — — — — — — — — — — — — — — — — 
+//————————————————————————————————————————————————————————————————————————————————
+
+trends = ha_c_smooth >= ha_o_smooth
+
+color_trend = trends ? color_positive : color_negative
+
+color_show_line_positive = show_line ? color_positive : na
+color_show_line_negative = show_line ? color_negative : na
+
+color_show_hl_cloud = show_hl_cloud ? color_hl : na
+color_show_oc_cloud = show_oc_cloud ? color_trend : na
+
+//————————————————————————————————————————————————————————————————————————————————
+// III.2. Display, Plotting & Filling — — — — — — — — — — — — — — — — — — — — — — 
+//————————————————————————————————————————————————————————————————————————————————
+
+o_line = plot(ha_o_smooth, color=color_show_line_positive, title="Open line")
+c_line = plot(ha_c_smooth, color=color_show_line_negative, title="Close line")
+
+h_line = plot(ha_h_smooth, color=color_show_line_positive, title="High line")
+l_line = plot(ha_l_smooth, color=color_show_line_negative, title="Low line")
+
+fill(o_line, c_line, color=color_show_oc_cloud, title="Open & Close Trendcloud")
+fill(h_line, l_line, color=color_show_hl_cloud, title="High & Low Trendcloud")
+
+//SUPERTREND INDICATOR CREATED BY KivancOzbilgic
+Periods = input(title='ATR Period', defval=10, group='Supertrend')
+src = input(hl2, title='Source', group='Supertrend')
+Multiplier = input.float(title='ATR Multiplier', step=0.1, defval=3.0, group='Supertrend')
+changeATR = input(title='Change ATR Calculation Method ?', defval=true, group='Supertrend')
+atr2 = ta.sma(ta.tr, Periods)
+atr = changeATR ? ta.atr(Periods) : atr2
+up = src - Multiplier * atr
+up1 = nz(up[1], up)
+up := close[1] > up1 ? math.max(up, up1) : up
+dn = src + Multiplier * atr
+dn1 = nz(dn[1], dn)
+dn := close[1] < dn1 ? math.min(dn, dn1) : dn
+trend2 = 1
+trend2 := nz(trend2[1], trend2)
+trend2 := trend2 == -1 and close > dn1 ? 1 : trend2 == 1 and close < up1 ? -1 : trend2
+
+buySignal  = trend2 ==  1 and trend2[1] == -1
+sellSignal = trend2 == -1 and trend2[1] == 1
+
+upPlot = plot(trend2 == 1 ? up : na, title='Up Trend', style=plot.style_linebr, linewidth=2, color=color.new(color.green, 0))
+dnPlot = plot(trend2 == 1 ? na : dn, title='Down Trend', style=plot.style_linebr, linewidth=2, color=color.new(color.red, 0))
+
+plotshape(buySignal ? up : na, title='UpTrend Begins', location=location.absolute, style=shape.circle, size=size.tiny, color=color.new(color.green, 0))
+plotshape(sellSignal ? dn : na, title='DownTrend Begins', location=location.absolute, style=shape.circle, size=size.tiny, color=color.new(color.red, 0))
+
+mPlot = plot(ohlc4, title='', style=plot.style_circles, linewidth=0)
+longFillColor  = true? trend2 == 1 ? color.green : color.white : color.white
+shortFillColor = true? trend2 == -1 ? color.red : color.white : color.white
+fill(mPlot, upPlot, title='UpTrend Highligter', color=longFillColor, transp=90)
+fill(mPlot, dnPlot, title='DownTrend Highligter', color=shortFillColor, transp=90)
+
+//QQE MOD INDICATOR CREATED BY Minkel00
+qqe() =>
+    RSI_Period = input(6, title='RSI Length', group='QQE')
+    SF = input(5, title='RSI Smoothing', group='QQE')
+    QQE = input(3, title='Fast QQE Factor', group='QQE')
+    ThreshHold = input(3, title='Thresh-hold', group='QQE')
+    src = input(close, title='RSI Source', group='QQE')
+    length = input.int(50, minval=1, title='Bollinger Length', group='QQE')
+    mult = input.float(0.35, minval=0.001, maxval=5, step=0.1, title='BB Multiplier', group='QQE')
+    RSI_Period2 = input(6, title='RSI Length', group='QQE')
+    SF2 = input(5, title='RSI Smoothing', group='QQE')
+    QQE2 = input(1.61, title='Fast QQE2 Factor', group='QQE')
+    ThreshHold2 = input(3, title='Thresh-hold', group='QQE')
+    src2 = input(close, title='RSI Source', group='QQE')
+
+    Wilders_Period = RSI_Period * 2 - 1
+
+    Rsi = ta.rsi(src, RSI_Period)
+    RsiMa = ta.ema(Rsi, SF)
+    AtrRsi = math.abs(RsiMa[1] - RsiMa)
+    MaAtrRsi = ta.ema(AtrRsi, Wilders_Period)
+    dar = ta.ema(MaAtrRsi, Wilders_Period) * QQE
+
+    longband = 0.0
+    shortband = 0.0
+    trend = 0
+
+    DeltaFastAtrRsi = dar
+    RSIndex = RsiMa
+    newshortband = RSIndex + DeltaFastAtrRsi
+    newlongband = RSIndex - DeltaFastAtrRsi
+    longband := RSIndex[1] > longband[1] and RSIndex > longband[1] ? math.max(longband[1], newlongband) : newlongband
+    shortband := RSIndex[1] < shortband[1] and RSIndex < shortband[1] ? math.min(shortband[1], newshortband) : newshortband
+    cross_1 = ta.cross(longband[1], RSIndex)
+    trend := ta.cross(RSIndex, shortband[1]) ? 1 : cross_1 ? -1 : nz(trend[1], 1)
+    FastAtrRsiTL = trend == 1 ? longband : shortband
+
+    basis = ta.sma(FastAtrRsiTL - 50, length)
+    dev = mult * ta.stdev(FastAtrRsiTL - 50, length)
+    upper = basis + dev
+    lower = basis - dev
+    color_bar = RsiMa - 50 > upper ? #00c3ff : RsiMa - 50 < lower ? #ff0062 : color.gray
+
+    QQEzlong = 0
+    QQEzlong := nz(QQEzlong[1])
+    QQEzshort = 0
+    QQEzshort := nz(QQEzshort[1])
+    QQEzlong := RSIndex >= 50 ? QQEzlong + 1 : 0
+    QQEzshort := RSIndex < 50 ? QQEzshort + 1 : 0
+
+    Wilders_Period2 = RSI_Period2 * 2 - 1
+
+    Rsi2 = ta.rsi(src2, RSI_Period2)
+    RsiMa2 = ta.ema(Rsi2, SF2)
+    AtrRsi2 = math.abs(RsiMa2[1] - RsiMa2)
+    MaAtrRsi2 = ta.ema(AtrRsi2, Wilders_Period2)
+    dar2 = ta.ema(MaAtrRsi2, Wilders_Period2) * QQE2
+    longband2 = 0.0
+    shortband2 = 0.0
+    trend2 = 0
+
+    DeltaFastAtrRsi2 = dar2
+    RSIndex2 = RsiMa2
+    newshortband2 = RSIndex2 + DeltaFastAtrRsi2
+    newlongband2 = RSIndex2 - DeltaFastAtrRsi2
+    longband2 := RSIndex2[1] > longband2[1] and RSIndex2 > longband2[1] ? math.max(longband2[1], newlongband2) : newlongband2
+    shortband2 := RSIndex2[1] < shortband2[1] and RSIndex2 < shortband2[1] ? math.min(shortband2[1], newshortband2) : newshortband2
+    cross_2 = ta.cross(longband2[1], RSIndex2)
+    trend2 := ta.cross(RSIndex2, shortband2[1]) ? 1 : cross_2 ? -1 : nz(trend2[1], 1)
+    FastAtrRsi2TL = trend2 == 1 ? longband2 : shortband2
+
+    QQE2zlong = 0
+    QQE2zlong := nz(QQE2zlong[1])
+    QQE2zshort = 0
+    QQE2zshort := nz(QQE2zshort[1])
+    QQE2zlong := RSIndex2 >= 50 ? QQE2zlong + 1 : 0
+    QQE2zshort := RSIndex2 < 50 ? QQE2zshort + 1 : 0
+
+    hcolor2 = RsiMa2 - 50 > ThreshHold2 ? color.silver : RsiMa2 - 50 < 0 - ThreshHold2 ? color.silver : na
+
+    Greenbar1 = RsiMa2 - 50 > ThreshHold2
+    Greenbar2 = RsiMa - 50 > upper
+
+    Redbar1 = RsiMa2 - 50 < 0 - ThreshHold2
+    Redbar2 = RsiMa - 50 < lower
+
+    blue_bar = Greenbar1 and Greenbar2
+    red_bar = Redbar1 and Redbar2 == 1
+    gray_bar = RsiMa2 - 50 > ThreshHold2 or RsiMa2 - 50 < 0 - ThreshHold2
+    no_bar = not gray_bar and not blue_bar and not gray_bar
+    [blue_bar, red_bar, gray_bar, no_bar]
+
+[blue_bar, red_bar, gray_bar, no_bar] = qqe()
+
+//RSI indicator
+ma(source, length, type) =>
+    switch type
+        "SMA" => ta.sma(source, length)
+        "Bollinger Bands" => ta.sma(source, length)
+        "EMA" => ta.ema(source, length)
+        "SMMA (RMA)" => ta.rma(source, length)
+        "WMA" => ta.wma(source, length)
+        "VWMA" => ta.vwma(source, length)
+
+rsiLengthInput = input.int(14, minval=1, title="RSI Length", group="RSI Settings")
+rsiSourceInput = input.source(close, "Source", group="RSI Settings")
+maTypeInput = input.string("SMA", title="MA Type", options=["SMA", "Bollinger Bands", "EMA", "SMMA (RMA)", "WMA", "VWMA"], group="MA Settings")
+maLengthInput = input.int(14, title="MA Length", group="MA Settings")
+bbMultInput = input.float(2.0, minval=0.001, maxval=50, title="BB StdDev", group="MA Settings")
+
+uprsi = ta.rma(math.max(ta.change(rsiSourceInput), 0), rsiLengthInput)
+down = ta.rma(-math.min(ta.change(rsiSourceInput), 0), rsiLengthInput)
+rsi = down == 0 ? 100 : uprsi == 0 ? 0 : 100 - (100 / (1 + uprsi / down))
+rsiMA = ma(rsi, maLengthInput, maTypeInput)
+isBB = maTypeInput == "Bollinger Bands"
+
+//rsiPlot = plot(rsi, "RSI", color=#7E57C2)
+//plot(rsiMA, "RSI-based MA", color=color.yellow)
+//rsiUpperBand = hline(70, "RSI Upper Band", color=#787B86)
+//midline = hline(50, "RSI Middle Band", color=color.new(#787B86, 50))
+//rsiLowerBand = hline(30, "RSI Lower Band", color=#787B86)
+//fill(rsiUpperBand, rsiLowerBand, color=color.rgb(126, 87, 194, 90), title="RSI Background Fill")
+//bbUpperBand = plot(isBB ? rsiMA + ta.stdev(rsi, maLengthInput) * bbMultInput : na, title = "Upper Bollinger Band", color=color.green)
+//bbLowerBand = plot(isBB ? rsiMA - ta.stdev(rsi, maLengthInput) * bbMultInput : na, title = "Lower Bollinger Band", color=color.green)
+//fill(bbUpperBand, bbLowerBand, color= isBB ? color.new(color.green, 90) : na, title="Bollinger Bands Background Fill")
+
+//midLinePlot = plot(50, color = na, editable = false, display = display.none)
+//fill(rsiPlot, midLinePlot, 100, 70, top_color = color.new(color.green, 0), bottom_color = color.new(color.green, 100),  title = "Overbought Gradient Fill")
+//fill(rsiPlot, midLinePlot, 30,  0,  top_color = color.new(color.red, 100), bottom_color = color.new(color.red, 0),      title = "Oversold Gradient Fill")
+
+//SIGNALS
+long  =  ha_c_smooth>=ha_o_smooth and trend2== 1  and blue_bar and rsi>=70
+short =  ha_c_smooth< ha_o_smooth and trend2==-1  and red_bar and rsi<=30
+  
+longCond  = long  and not long [1]
+shortCond = short and not short[1]
+
+// Chart Plot & Alerts
+plotshape(longCond,  textcolor=color.lime, color=color.lime, style=shape.triangleup , title="Buy" , text="Buy" , location=location.belowbar,  offset=0, size=size.small)
+plotshape(shortCond, textcolor=color.red,  color=color.red, style=shape.triangledown, title="Sell", text="Sell", location=location.abovebar,  offset=0, size=size.small)
+alertcondition(longCond , title="BUY Alert" )
+alertcondition(shortCond, title="SELL Alert")
